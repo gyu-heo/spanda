@@ -6,6 +6,59 @@ from numba import njit, jit, prange
 import pandas as pd
 import torch
 
+def create_ref_matrices(
+    input_data: dict,
+    sampling_events: list,
+    sampling_indices: dict,
+    sampling_windows: dict,
+    sampling_axis: int = 0,
+) -> list:
+    """
+    Use event_triggered_traces to index and create reference matrices for each session.
+    TODO (GH 2023): Generalize to tensors
+
+    Args:
+        input_data (dict):
+            keys: session index (e.g. date of experiment)
+            items: (num.of.samples, num.of.features) shape matrix
+        sampling_events (list):
+            list of sampling events (e.g. ["trial_onset", "threshold_crossing"])
+            Used as keys for sampling_indices and sampling_windows
+        sampling_indices (dict):
+            keys: session index (e.g. date of experiment)
+            items: dict of sampling indices for each sampling event
+                keys: sampling event (e.g. "trial_onset", "threshold_crossing")
+                items: (num.of.sampling_index,) shape array. list, np.ndarray, or torch.Tensor.
+        sampling_windows (dict):
+            keys: sampling event (e.g. "trial_onset", "threshold_crossing")
+            items: [start, end] of each sampling window
+        sampling_axis (int, optional):
+            Corresponding input_data axis to sample over. Dimension of your num.of.samples. Defaults to 0.
+    """
+    ref_matrices = []
+    for session in input_data:
+        full_trace = input_data[session]
+        average_trace = []
+
+        ## Iterate over defined sampling events
+        for sampling_event in sampling_events:
+            sampling_index = sampling_indices[session][sampling_event]
+            sampling_window = sampling_windows[sampling_event]
+
+            ## sample_trace: (num.of.sampling_index, sampling_window_size, num.of.features)
+            sample_trace, _, _ = event_triggered_traces(
+                arr=full_trace,
+                idx_triggers=sampling_index,
+                win_bounds=sampling_window,
+                dim=sampling_axis,
+            )
+            ## average_trace: (sampling_window_size, num.of.features)
+            average_trace.append(np.nanmean(sample_trace, axis=0))
+
+        ## Concatenate over sampling events to create a single reference matrix
+        ## ref_matrices: (sum.of.sampling_window_size, num.of.features)
+        ref_matrices.append(np.nan_to_num(np.concatenate(average_trace, axis=0)))
+    return ref_matrices
 
 def event_triggered_traces(
     arr,
@@ -180,3 +233,21 @@ def event_triggered_traces(
     windows_out = windows.numpy() if dtype_in == "np" else windows
 
     return arr_out, xAxis_out, windows_out
+
+
+def linear_interpolate(original_array, index_array):
+    """Create a new list by linearly interpolating between values in original_array at index_array.
+
+    Args:
+        original_array (np.ndarray):
+            Original array to be interpolated. Shape: (num.of.samples, num.of.features)
+        index_array (np.ndarray):
+            Index array for the interpolation. Shape: (num.of.samples,). dtype: int
+    """
+    unique_indices, unique_indices_idx, counts = np.unique(index_array, return_index=True, return_counts=True)
+
+    idx_markers = unique_indices_idx[counts[:-1] > 1][:-1] # Exclude the last index because it is the last index of the original array
+    interp_matrix = np.zeros((len(index_array), len(index_array)))
+
+    for ii, idx_marker in enumerate(idx_markers):
+        interp_matrix[idx_marker:idx_markers[ii+1], idx_marker:idx_markers[ii+1]] = np.eye(idx_markers[ii+1] - idx_marker)

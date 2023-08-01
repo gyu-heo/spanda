@@ -1,12 +1,13 @@
 import unittest
 import numpy as np
 
-from spanda import _param_defaults_drifter
-from spanda.util import util
+from spanda import _param_defaults_dFoF
+from spanda import util
+from spanda.math_module.timeSeries import event_triggered_traces
 from spanda.representation import drifter
 
 
-class Test_Drifter(unittest.TestCase):
+class Test_dFoF(unittest.TestCase):
     """Test class for Drifter representation"""
 
     @classmethod
@@ -59,42 +60,3 @@ class Test_Drifter(unittest.TestCase):
             }
         )
         self.assertEqual(drifter_instance.params["netrep_alpha"], 0.5)
-
-    def test_drifter_overwrite_params_json(self):
-        pass
-
-    def test_drifter_create_ref_matrices(self):
-        """
-        Create reference matrices from mock data and arguments
-        Test if the output has the correct shape
-        """
-        drifter_instance = drifter.drifter()
-        ref_matrices = drifter_instance.create_ref_matrices(
-            input_data=self.test_matrices,
-            sampling_events=self.sampling_events,
-            sampling_indices=self.sampling_indices,
-            sampling_windows=self.sampling_windows,
-            sampling_axis=self.sampling_axis,
-        )
-        self.assertEqual(len(ref_matrices), len(self.session_names))
-        self.assertEqual(ref_matrices[0].shape[self.sampling_axis - 1], self.n_features)
-        window_size = 0
-        for sampling_event in self.sampling_events:
-            window_size += np.diff(self.sampling_windows[sampling_event])
-        self.assertEqual(ref_matrices[0].shape[self.sampling_axis], window_size)
-
-    def test_drifter_fit(self):
-        """
-        Test if the fit method works correctly
-        """
-        pass
-
-    def test_drifter_pairwise_distance(self):
-        """
-        Test if the pairwise distance method works correctly
-        """
-        pass
-
-
-if __name__ == "__main__":
-    unittest.main()

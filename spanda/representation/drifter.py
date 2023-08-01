@@ -13,8 +13,7 @@ import pickle
 from tqdm import tqdm
 
 from spanda import _param_defaults_drifter
-from spanda import util
-from spanda.bnpm.timeseries import event_triggered_traces
+from spanda.util import util, indexing
 from spanda.representation.netrep import LinearMetric
 
 
@@ -41,61 +40,6 @@ class drifter:
 
         if params_input is not None:
             self.params = util.overwrite_params(self.params_input, self.params)
-
-    def create_ref_matrices(
-        self,
-        input_data: dict,
-        sampling_events: list,
-        sampling_indices: dict,
-        sampling_windows: dict,
-        sampling_axis: int = 0,
-    ) -> list:
-        """
-        Create reference matrices for each session.
-        drifter will compare each sessions' reference matrix to measure the amount of drift.
-
-        Args:
-            input_data (dict):
-                keys: session index (e.g. date of experiment)
-                items: (num.of.samples, num.of.features) shape matrix
-            sampling_events (list):
-                list of sampling events (e.g. trial_onset, threshold_crossing)
-                Used as keys for sampling_indices and sampling_windows
-            sampling_indices (dict):
-                keys: session index (e.g. date of experiment)
-                items: dict of sampling indices for each sampling event
-                    keys: sampling event (e.g. trial_onset, threshold_crossing)
-                    items: (num.of.sampling_index,) shape array. list, np.ndarray, or torch.Tensor.
-            sampling_windows (dict):
-                keys: sampling event (e.g. trial_onset, threshold_crossing)
-                items: [start, end] of sampling window
-            sampling_axis (int, optional):
-                Corresponding input_data axis to sample over. Dimension of your num.of.samples. Defaults to 0.
-        """
-        ref_matrices = []
-        for session in input_data:
-            full_trace = input_data[session]
-            average_trace = []
-
-            ## Iterate over defined sampling events
-            for sampling_event in sampling_events:
-                sampling_index = sampling_indices[session][sampling_event]
-                sampling_window = sampling_windows[sampling_event]
-
-                ## sample_trace: (num.of.sampling_index, sampling_window_size, num.of.features)
-                sample_trace, _, _ = event_triggered_traces(
-                    arr=full_trace,
-                    idx_triggers=sampling_index,
-                    win_bounds=sampling_window,
-                    dim=sampling_axis,
-                )
-                ## average_trace: (sampling_window_size, num.of.features)
-                average_trace.append(np.nanmean(sample_trace, axis=0))
-
-            ## Concatenate over sampling events to create a single reference matrix
-            ## ref_matrices: (sum.of.sampling_window_size, num.of.features)
-            ref_matrices.append(np.nan_to_num(np.concatenate(average_trace, axis=0)))
-        return ref_matrices
 
     def fit(
         self,

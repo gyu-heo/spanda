@@ -20,6 +20,61 @@ def overwrite_params(params_input, default_params) -> dict:
     return default_params
 
 
+def make_batches(
+    iterable,
+    batch_size=None,
+    num_batches=None,
+    min_batch_size=0,
+    return_idx=False,
+    length=None,
+):
+    """
+    Make batches of data or any other iterable.
+    RH 2021
+
+    Args:
+        iterable (iterable):
+            iterable to be batched
+        batch_size (int):
+            size of each batch
+            if None, then batch_size based on num_batches
+        num_batches (int):
+            number of batches to make
+        min_batch_size (int):
+            minimum size of each batch
+        return_idx (bool):
+            whether to return the slice indices of the batches.
+            output will be [start, end] idx
+        length (int):
+            length of the iterable.
+            if None, then length is len(iterable)
+            This is useful if you want to make batches of
+             something that doesn't have a __len__ method.
+
+    Returns:
+        output (iterable):
+            batches of iterable
+    """
+
+    if length is None:
+        l = len(iterable)
+    else:
+        l = length
+
+    if batch_size is None:
+        batch_size = np.int64(np.ceil(l / num_batches))
+
+    for start in range(0, l, batch_size):
+        end = min(start + batch_size, l)
+        if (end - start) < min_batch_size:
+            break
+        else:
+            if return_idx:
+                yield iterable[start:end], [start, end]
+            else:
+                yield iterable[start:end]
+
+
 def center_mean(
     X: np.ndarray,
     axis: int = 0,
@@ -72,6 +127,8 @@ def weight_transform(
         return X * feature_variance
     elif weight_method == "custom":
         return X * weights
+    else:
+        raise ValueError("weight_method should be 'uniform', 'EV', or 'custom'.")
 
 
 def plotly_imshow(
